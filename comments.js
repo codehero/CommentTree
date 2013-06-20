@@ -84,7 +84,7 @@ CommentTree.prototype._getTreeHelp = function(nodes, depth, appendCB, cb){
 				if(v.value[0]){
 					/* This is a child node.
 					 * The parent node ID is the key. */
-					children.push(v[0]);
+					children.push(v);
 					ret.push([v.value[0], v.id, v.key]);
 				}
 			}
@@ -185,18 +185,18 @@ CommentTree.prototype.addNode = function(data, parent, cb){
 			}
 
 			/* If no rows, no parent exists. */
-			if(0 == result.rows.length){
+			if(0 == result.rows.length && parent){
 				cb({"message" : "Parent does not exist!"});
 				return;
+			}else{
+			/* Add parent id. */
+				data["commentTree.parent"] = parent;
 			}
 
 			/* Generate new comment id if it does not exist. */
 			var newID = new Date().getTime();
 			if(!("commentTree.id" in data))
 				data["commentTree.id"] = newID;
-
-			/* Add parent id. */
-			data["commentTree.parent"] = parent;
 
 			var doc = ct._cdb.doc();
 			doc.body = data;
