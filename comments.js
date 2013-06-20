@@ -1,5 +1,7 @@
-var couchdb = require("couchdb-api");
+var util = require("util");
+var fs = require("fs");
 
+/** @brief  */
 var CommentTree = function(cdb, cfg){
 	var ct = this;
 	ct.cfg = cfg;
@@ -31,8 +33,7 @@ CommentTree.prototype._listenForChanges = function(last_seq){
 		"include_docs":true
 	};
 
-	var cdb = this._db;
-	cdb.changes(opts, function(err, changeStream){
+	ct._cdb.changes(opts, function(err, changeStream){
 		changeStream.on("change", function(change){
 			ct._onChange(change);
 		});
@@ -54,49 +55,108 @@ CommentTree.prototype._listenForChanges = function(last_seq){
 	});
 }
 
-/** @brief This function obtains the tree structure for each root node in the
- * roots[] array.
- *  @param roots Numeric root node ids
- *  @param depth Maximum depth of tree to return. -1 or CommentTree.INFINITY to have no limit.
- * @return Array in the following format:
- * [
- * 	[nodeID, _id, parentID]
- * 	....
- * ]
- * 	*/
-CommentTree.prototype.getTree = function(roots, depth, descending, cb){
+CommentTree.prototype._onChange= function(change){
+	/* TODO update tree cache based on change. */
+}
+
+CommentTree.prototype._getTreeHelp = function(nodes, depth, appendCB, cb){
 	var ct = this;
 
 	/* TODO: Lookup tree in the local cache. */
 
-	var ddoc = cdb.ddoc("CommentTree");
+	var ddoc = ct._cdb.ddoc("CommentTree");
 	ddoc.view("Links").query(
 		{
 			"reduce" : false
-			,"keys" : [roots]
-			,"descending" : descending
 		},
+		nodes,
 		function(err, result){
 			if(err){
 				cb(err);
 				return;
 			}
 
+			var ret = [];
+			var children = [];
+			for(var i = 0; i < result.rows.length; ++i){
+				var v = result.rows[i];
+				/* If null, then one of the nodes. */
+				if(v.value[0]){
+					/* This is a child node.
+					 * The parent node ID is the key. */
+					children.push(v[0]);
+					ret.push([v.value[0], v.id, v.key]);
+				}
+			}
+			appendCB(ret);
+
+			if(depth && children.length)
+				ct._getTreeHelp(children, depth > 0 ? depth - 1 : -1, appendCB, cb);
+			else
+				cb(null);
+		}
+	);
+}
+
+/** @brief This function obtains the tree structure for each root node in the
+ * roots[] array by doing a BFS exploration from the root nodes.
+ *  @param roots Numeric root node ids
+ *  @param depth Maximum depth of tree to return. -1 or CommentTree.INFINITY to have no limit.
+ * @return Array in the following format:
+ * [
+ * 	[nodeID, node._id, parentID]
+ * 	....
+ * ]
+ * parentID may be null if this is the root.
+ * 	*/
+CommentTree.prototype.getTree = function(roots, depth, cb){
+	var ct = this;
+
+	/* TODO: Lookup tree in the local cache. */
+
+	var ddoc = ct._cdb.ddoc("CommentTree");
+	ddoc.view("Links").query(
+		{
+			"reduce" : false
+		},
+		roots,
+		function(err, result){
+			if(err){
+				cb(err);
+				return;
+			}
+
+			var ret = [];
 			var children = [];
 			for(var i = 0; i < result.rows.length; ++i){
 				var v = result.rows[i];
 				/* If null, then one of the roots. */
-				if(null == v[0]){
+				if(null == v.value[0]){
+					ret.push([v.key, v.id, null]);
 				}
 				else{
-					/* This is a child node. */
-					children.push(v[0]);
+					/* This is a child node.
+					 * The parent node ID is the key. */
+					children.push(v.value[0]);
+					ret.push([v.value[0], v.id, v.key]);
 				}
+			}
+
+			if(depth && children.length){
+				ct._getTreeHelp(children, depth > 0 ? depth - 1 : -1
+				,function(arr){
+					ret = ret.concat(arr);
+				}
+				,function(err){
+					cb(err, ret);
+				});
 			}
 		}
 	);
 }
 
+/** @brief TODO Traverse from the given node all the way to the root.
+ * This requires another map() */
 CommentTree.prototype.getPath = function(endNode, cb){
 	var ct = this;
 }
@@ -111,7 +171,7 @@ CommentTree.prototype.addNode = function(data, parent, cb){
 	}
 
 	/* Verify that parent exists. */
-	var ddoc = cdb.ddoc("CommentTree");
+	var ddoc = ct._cdb.ddoc("CommentTree");
 	ddoc.view("Links").query(
 		{
 			"reduce" : false
@@ -135,6 +195,9 @@ CommentTree.prototype.addNode = function(data, parent, cb){
 			if(!("commentTree.id" in data))
 				data["commentTree.id"] = newID;
 
+			/* Add parent id. */
+			data["commentTree.parent"] = parent;
+
 			var doc = ct._cdb.doc();
 			doc.body = data;
 
@@ -149,3 +212,4 @@ CommentTree.prototype.addNode = function(data, parent, cb){
 	);
 }
 
+exports.CommentTree = CommentTree;
