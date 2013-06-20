@@ -29,6 +29,7 @@ treeDB.addNode({"test":2}, 10, function(err, newID){
 			return;
 		}
 
-		console.log("FINAL ANSER" + JSON.stringify(data));
+		console.log("RAW ANSWER" + JSON.stringify(data));
+		console.log("TREE ANSER" + JSON.stringify(CommentTree.makeTree(data)));
 	});
 //});

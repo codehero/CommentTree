@@ -212,4 +212,45 @@ CommentTree.prototype.addNode = function(data, parent, cb){
 	);
 }
 
+exports.makeTree = function(data){
+	/* Sort the data array by numerical ID. Since non-root nodes are added by
+	 * timestamp, we know that a node's ancestor must precede it in the array. */
+	function comp(a, b){
+		return a[0] - b[0];
+	}
+
+	util.debug(JSON.stringify(data));
+	data.sort(comp);
+	util.debug(JSON.stringify(data));
+
+	var roots = {};
+	var nodeMap = {};
+
+	/* Add all the roots. */
+	var lastKey = "";
+	for(var idx = 0; idx < data.length; ++idx){
+		var row = data[idx];
+		var key = row[0] + "";
+		if(key != lastKey){
+			nodeMap[key] = {
+				"data" : row
+			};
+			lastKey = key;
+		}
+
+		if(null == row[2])
+			roots[key] = nodeMap[key];
+		else{
+			var parent = nodeMap[row[2] + ""];
+			if(!parent)
+				throw new Error("Database integrity error. Parent is newer than child.");
+			if(!("children" in parent))
+				parent.children = [];
+			parent.children.push(nodeMap[key]);
+		}
+	}
+
+	return roots;
+}
+
 exports.CommentTree = CommentTree;
