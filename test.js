@@ -15,21 +15,21 @@ client.auth = CONFIG.user +":"+ CONFIG.password;
 var cdb = client.db(CONFIG.dbName);
 
 var treeDB = new CommentTree.CommentTree(cdb);
-/*
-treeDB.addNode({"test":2}, 10, function(err, newID){
-	if(err){
-		util.debug("ADD NODE ERROR: " + JSON.stringify(err));
-		return;
-	}
-	*/
 
-	treeDB.getTree([10], -1, function(err, data){
+//treeDB.addNode({"test":4}, 1371765000851, function(err, newID){
+//	if(err){
+//		util.debug("ADD NODE ERROR: " + JSON.stringify(err));
+//		return;
+//	}
+	
+
+	treeDB.getTree([1371764617811], -1, function(err, data){
 		if(err){
 			util.debug("GET TREE ERROR: " + JSON.stringify(err));
 			return;
 		}
 
-		console.log("RAW ANSWER" + JSON.stringify(data));
-		console.log("TREE ANSER" + JSON.stringify(CommentTree.makeTree(data)));
+		console.log("FINAL ANSER" + JSON.stringify(data));
+		return;
 	});
 //});
